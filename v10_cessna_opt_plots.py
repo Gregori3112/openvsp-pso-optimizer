@@ -100,7 +100,7 @@ def FCN(x: np.ndarray) -> float:
     vsp.SetDoubleAnalysisInput(solver_id, "AlphaEnd", [alpha])
     vsp.SetIntAnalysisInput(solver_id, "AlphaNpts", [1])
     vsp.SetIntAnalysisInput(solver_id, "GeomSet", [vsp.SET_ALL])
-    vsp.SetIntAnalysisInput(solver_id, "NCPU", [1])
+    vsp.SetIntAnalysisInput(solver_id, "NCPU", [8])
 
     # Executa o solver aerodinâmico
     vsp.ExecAnalysis(solver_id)
@@ -156,9 +156,8 @@ def FCN(x: np.ndarray) -> float:
     import gc
     gc.collect()
 
-    # Retorna: função objetivo, CL, CD e L/D
-    return fobj, cl, cd, ld
 
+    return fobj, CLtot, CDtot, L_D
 
 
 # ============================================================

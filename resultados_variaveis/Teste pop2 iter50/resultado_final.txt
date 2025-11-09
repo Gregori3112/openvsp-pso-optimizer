@@ -1,0 +1,18 @@
+=============================================
+   RESULTADOS FINAIS DA OTIMIZAÇÃO PSO
+=============================================
+
+Iterações concluídas (k): 15
+Critério de convergência (norm): 0.007702
+Melhor valor da função objetivo (gbest): -32.909425
+
+📊 Variáveis ótimas encontradas (xgbest):
+   AR         =  10.6451
+   span       =  34.0000
+   taper      =   0.7265
+   sweep      =   5.4227
+   twist      =   3.0000
+   alpha      =   0.0045
+
+✅ Gráficos e resultados salvos em:
+C:\VSP\Development\PSO_PYTHON_WING\resultados_variaveis

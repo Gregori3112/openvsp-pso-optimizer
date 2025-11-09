@@ -68,9 +68,9 @@ nrvar = len(xmin)                                     # número de variáveis (6
 lambda1 = 2.02          # coeficiente cognitivo (atração pelo melhor individual)
 lambda2 = 2.02          # coeficiente social (atração pelo melhor global)
 omega = 0.4             # fator de inércia (peso da velocidade anterior)
-pop = 2                 # tamanho da população (número de partículas)
-tol = 1e-2              # tolerância para critério de parada
-itermax = 50            # número máximo de iterações
+pop = 8                 # tamanho da população (número de partículas)
+tol = 1e-4              # tolerância para critério de parada
+itermax = 42             # número máximo de iterações
 random.seed(2)          # semente para reprodutibilidade
 
 # ============================================================
@@ -93,7 +93,8 @@ for i in range(pop):
         x[i, j] = xmin[j] + (xmax[j] - xmin[j]) * random.random()
 
     # Avalia o desempenho aerodinâmico (chamada do OpenVSP)
-    y = FCN(x[i, :])
+    y, CL, CD, LD = FCN(x[i, :])
+
 
     # --- Libera o OpenVSP da memória e reinicia a engine ---
     import importlib, openvsp, time
@@ -151,7 +152,8 @@ while not flag:
             x[i, j] = xnew_ij
 
         # Calcula o novo valor da função objetivo para a partícula atual
-        ynew = FCN(x[i, :])
+        ynew, CL, CD, LD = FCN(x[i, :])
+
 
         # --- Libera memória e reinicia o módulo do OpenVSP ---
         time.sleep(0.5)
@@ -167,6 +169,11 @@ while not flag:
         if ynew < gbest[k - 1]:
             gbest[k - 1] = ynew
             xgbest = x[i, :].copy()
+
+            CL_best = CL
+            CD_best = CD
+            LD_best = LD
+
 
     # ========================================================
     # Armazena histórico de resultados
@@ -268,16 +275,19 @@ for name, value in zip(var_names, xgbest):
     print(f"   {name:<10} = {value:>8.4f}")
 
 # ============================================================
-# 9 Salvamento do resultado final em arquivo .txt
+# 9 Salvamento do resultado final em arquivo .txt (automático)
 # ============================================================
 
-# Caminho do arquivo de saída (salvo na mesma pasta dos gráficos)
 result_file = os.path.join(output_dir, "resultado_final.txt")
 
 with open(result_file, "w", encoding="utf-8") as f:
     f.write("=============================================\n")
     f.write("   RESULTADOS FINAIS DA OTIMIZAÇÃO PSO\n")
     f.write("=============================================\n\n")
+
+    f.write(f"[ok] CL={CL_best:.4f}, CD={CD_best:.4f}, L/D={LD_best:.2f}\n")
+    f.write("[solver] Simulação VSPAERO executada.\n\n")
+
     f.write(f"Iterações concluídas (k): {k - 1}\n")
     if 'norm' in locals():
         f.write(f"Critério de convergência (norm): {norm:.6f}\n")
@@ -290,6 +300,7 @@ with open(result_file, "w", encoding="utf-8") as f:
     f.write("\n✅ Gráficos e resultados salvos em:\n")
     f.write(f"{os.path.abspath(output_dir)}\n")
 
-print(f"\n🗂️ Resultado final salvo em: {result_file}")
+print(f"\n✅ Resultado final salvo em: {result_file}")
+
 
 
