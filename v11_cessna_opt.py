@@ -17,6 +17,15 @@ def FCN(x: np.ndarray) -> float:
     (para ser usado num algoritmo de otimização, como o PSO).
     """
 
+    for f in os.listdir(r"C:\VSP\Development\PSO_PYTHON_WING"):
+        if f.startswith("cessna_updated.") or f.startswith("temp_polar."):
+            try:
+                os.remove(os.path.join(r"C:\VSP\Development\PSO_PYTHON_WING", f))
+            except PermissionError:
+                pass
+
+
+
     # === 1️⃣ CARREGAMENTO DO MODELO BASE ===
     # Caminho do arquivo do modelo original (.vsp3)
     VSP3_FILE = r"C:\VSP\Development\PSO_PYTHON_WING\cessna210.vsp3"
@@ -37,7 +46,7 @@ def FCN(x: np.ndarray) -> float:
     # As variáveis de entrada representam:
     # AR = razão de aspecto, span = envergadura total, taper = razão de afilamento,
     # sweep = enflechamento, twist = torção, alpha = ângulo de ataque.
-    AR, span, taper, sweep, twist, alpha = x
+    AR, span, taper, sweep, twist = x
 
     # --- Calcula cordas coerentes com o AR e taper definidos ---
     croot = 2 * span / (AR * (1 + taper))
@@ -63,49 +72,106 @@ def FCN(x: np.ndarray) -> float:
     # ============================================================
     # 3️⃣ EXECUÇÃO DO SOLVER AERODINÂMICO (VSPAERO)
     # ============================================================
-
-
     vsp.Update()
+    vsp.WriteVSPFile(r"C:\VSP\Development\PSO_PYTHON_WING\cessna_updated.vsp3")
  
     # Configura o gerador de malha (VSPAEROComputeGeometry)    
     vsp.SetAnalysisInputDefaults("VSPAEROComputeGeometry")
     vsp.SetIntAnalysisInput("VSPAEROComputeGeometry", "GeomSet", [vsp.SET_ALL])
-    vsp.SetStringAnalysisInput("VSPAEROSweep", "PolarFileName", [""])
     vsp.ExecAnalysis("VSPAEROComputeGeometry")
 
-    # 3.1 Gera geometria degenerada (malha usada pelo solver)
-    vsp.WriteVSPFile(r"C:\VSP\Development\PSO_PYTHON_WING\cessna_updated.vsp3")
-
     # ------------------------------------------------------------
-    # 3.2 Configura o solver VSPAERO propriamente dito
+    # 3.1 Configura o solver VSPAERO propriamente dito
     # ------------------------------------------------------------
-
     vsp.SetAnalysisInputDefaults(solver_id)  # reseta parâmetros do solver
+    # === Desativa saídas opcionais (.polar e .slc) para evitar erros ===
+    available_inputs = []
+    try:
+        available_inputs = vsp.GetAnalysisInputNames(solver_id)
+    except:
+        pass
+
+    if "PolarFileName" in available_inputs:
+        vsp.SetStringAnalysisInput(solver_id, "PolarFileName", [""])
+    if "SliceFileName" in available_inputs:
+        vsp.SetStringAnalysisInput(solver_id, "SliceFileName", [""])
+    if "NumSlices" in available_inputs:
+        vsp.SetIntAnalysisInput(solver_id, "NumSlices", [0])
+
+
+
 
     # ------------------------------------------------------------
-    # 3.3 Define parâmetros principais de análise
+    # 3.2 Define parâmetros principais de análise
     # ------------------------------------------------------------
-    # Calcula área, envergadura e corda média para entradas do solver
     sref = vsp.GetParmVal(wing_id, "TotalArea", "WingGeom")
     bref = vsp.GetParmVal(wing_id, "TotalSpan", "WingGeom")
     cref = (2/3) * croot * ((1 + taper + taper**2) / (1 + taper))
 
-    # Define condições de voo e propriedades do ar
-    vsp.SetDoubleAnalysisInput(solver_id, "Sref", [sref])
-    vsp.SetDoubleAnalysisInput(solver_id, "Rho", [0.002377])     # densidade do ar (slug/ft³)
-    vsp.SetDoubleAnalysisInput(solver_id, "Vinf", [100.0])       # velocidade (ft/s)
-    vsp.SetDoubleAnalysisInput(solver_id, "MachStart", [0.3])
-    vsp.SetDoubleAnalysisInput(solver_id, "MachEnd", [0.3])
-    vsp.SetIntAnalysisInput(solver_id, "MachNpts", [1])
-    vsp.SetDoubleAnalysisInput(solver_id, "AlphaStart", [alpha])
-    vsp.SetDoubleAnalysisInput(solver_id, "AlphaEnd", [alpha])
-    vsp.SetIntAnalysisInput(solver_id, "AlphaNpts", [1])
-    vsp.SetIntAnalysisInput(solver_id, "GeomSet", [vsp.SET_ALL])
-    vsp.SetIntAnalysisInput(solver_id, "NCPU", [8])
+    # --- Condições de voo e propriedades do ar ---
+    W = 1800 * 9.81                     # peso [N]
+    rho = 0.002377 * 515.379            # densidade do ar [kg/m³] (ISA nível do mar)
+    T = 288.15                          # temperatura [K]
+    gamma = 1.4
+    R = 287.05
+    M = 0.3                             # número de Mach desejado
+    a = (gamma * R * T) ** 0.5          # velocidade do som [m/s]
+    V = M * a                           # velocidade de voo [m/s]
+    S = sref * (0.3048 ** 2)            # área da asa [m²]
+    hist_path = r"C:\VSP\Development\PSO_PYTHON_WING\cessna_updated.history"
 
-    # Executa o solver aerodinâmico
-    vsp.ExecAnalysis(solver_id)
+    print(f"[flight] Mach={M:.2f}  →  V={V:.2f} m/s  ({V/0.3048:.1f} ft/s)")
 
+
+    # ------------------------------------------------------------
+    # Ajuste automático do ângulo de ataque para L ≈ W
+    # ------------------------------------------------------------
+    target_L = W
+    tol_L = 0.05 * W
+    alpha = 0.0
+    step = 0.5
+
+    for _ in range(4):
+        # Define o alpha atual e executa o solver
+        vsp.SetIntAnalysisInput(solver_id, "NumWakeNodes", [32])
+        vsp.SetIntAnalysisInput(solver_id, "NCPU", [4])
+        vsp.SetDoubleAnalysisInput(solver_id, "Sref", [sref])
+        vsp.SetDoubleAnalysisInput(solver_id, "Rho", [0.002377])
+        vsp.SetDoubleAnalysisInput(solver_id, "Vinf", [V / 0.3048])
+        vsp.SetDoubleAnalysisInput(solver_id, "MachStart", [M])
+        vsp.SetDoubleAnalysisInput(solver_id, "MachEnd", [M])
+        vsp.SetIntAnalysisInput(solver_id, "MachNpts", [1])
+        vsp.SetDoubleAnalysisInput(solver_id, "AlphaStart", [alpha])
+        vsp.SetDoubleAnalysisInput(solver_id, "AlphaEnd", [alpha])
+        vsp.SetIntAnalysisInput(solver_id, "AlphaNpts", [1])
+        vsp.SetIntAnalysisInput(solver_id, "GeomSet", [vsp.SET_ALL])
+
+
+        vsp.ExecAnalysis(solver_id)
+
+
+        import time
+        for _ in range(10):
+            if os.path.exists(hist_path):
+                break
+            time.sleep(0.5)
+
+        # Lê o .history para pegar CL e CD
+        with open(hist_path, "r") as f:
+            lines = [l.strip() for l in f.readlines() if l.strip() and not l.startswith("#")]
+        last_line = lines[-1].split()
+        cl = float(last_line[6])
+        cd = float(last_line[9])
+
+        # Calcula sustentação e erro
+        L = 0.5 * rho * V**2 * S * cl
+        error = (L - target_L) / target_L
+
+        if abs(error) < 0.05:
+            break
+        alpha -= step * error  # ajusta ângulo de ataque
+
+    print(f"[auto-alpha] Alpha ajustado para {alpha:.2f}° com L={L:.1f} N")
 
     # ============================================================
     # 4️⃣ LEITURA E AVALIAÇÃO DOS RESULTADOS
@@ -114,7 +180,6 @@ def FCN(x: np.ndarray) -> float:
     # Caminho do arquivo de resultados (.history)
     hist_path = r"C:\VSP\Development\PSO_PYTHON_WING\cessna_updated.history"
 
-
     # Lê o arquivo, ignorando linhas de cabeçalho
     with open(hist_path, "r") as f:
         lines = [l.strip() for l in f.readlines() if l.strip() and not l.startswith("#")]
@@ -122,27 +187,34 @@ def FCN(x: np.ndarray) -> float:
     # Pega a última linha (resultado final)
     last_line = lines[-1].split()
 
-
     # Extrai CL, CD e calcula razão L/D
     cl = float(last_line[6])  # coluna CLtot
     cd = float(last_line[9])  # coluna CDtot
     ld = cl / cd
 
     # ------------------------------------------------------------
-    # 4.1 Aplica penalização caso CL saia da faixa aceitável
+    # 4.1 Aplica penalização caso L saia da faixa aceitável
     # ------------------------------------------------------------
-    cl_ref = 0.38               # valor alvo de CL para cruzeiro
-    cl_min = cl_ref * 0.95
-    cl_max = cl_ref * 1.05
 
-    if cl < cl_min or cl > cl_max:
-        penalty = 1000 * abs(cl - cl_ref)
-        print(f"[penalty] CL fora do intervalo: {cl:.3f} (penalidade {penalty:.2f})")
+    print(f"[flight] Mach={M:.2f}  →  V={V:.2f} m/s ({V/0.3048:.1f} ft/s)")
+
+
+    # Calcula sustentação real em newtons
+    L = 0.5 * rho * V**2 * S * cl
+
+    # Define margens de ±5%
+    L_min = W * 0.95
+    L_max = W * 1.05
+
+    if L < L_min or L > L_max:
+        penalty = 100 * abs((L - W) / W) ** 1.5  # penaliza proporcionalmente ao desvio relativo
+        print(f"[penalty] L fora do intervalo: {L:.1f} N (peso={W:.1f} N, penalidade={penalty:.2f})")
     else:
         penalty = 0
 
     # Mostra resultados principais
-    print(f"[ok] CL={cl:.4f}, CD={cd:.4f}, L/D={ld:.2f}")
+    print(f"[ok] CL={cl:.4f}, CD={cd:.4f}, L={L:.2f}, L/D={ld:.2f}")
+    print(f"[status] Sustentação {'OK' if penalty == 0 else 'fora da faixa'} | α={alpha:.2f}°, L/D={ld:.2f}")
     print("[solver] Simulação VSPAERO executada.")
 
     # ============================================================
@@ -152,13 +224,20 @@ def FCN(x: np.ndarray) -> float:
     fobj = -ld + penalty
 
     # --- Encerra e limpa completamente o modelo atual para liberar memória ---
-    vsp.ClearVSPModel()
-    vsp.Update()
     import gc
+    import time
+    vsp.ClearVSPModel()
+    time.sleep(2)
     gc.collect()
+    print(f"[done] Iteração finalizada: fobj={fobj:.4f}, L/D={ld:.2f}")
+    print(f"[obj] fobj={fobj:.2f}, -L/D={-ld:.2f}, penalty={penalty:.2f}")
+
 
     # Retorna: função objetivo, CL, CD e L/D
-    return fobj, cl, cd, ld
+    return fobj, {"CL": cl, "CD": cd, "LD": ld, "Alpha": alpha, "L": L}
+
+
+
 
 
 
@@ -166,8 +245,8 @@ def FCN(x: np.ndarray) -> float:
 # Execução isolada (modo de teste)
 # ============================================================
 if __name__ == "__main__":
-    # Vetor de teste: [AR, span, taper, sweep, twist, alpha]
-    x_test = np.array([8, 36.0, 0.5, 30, -6, 2.0])
+    # Vetor de teste: [AR, span, taper, sweep, twist]
+    x_test = np.array([7.5, 36.0, 1, 0, 0])
 
     # Executa uma simulação e imprime o resultado final
     resultado = FCN(x_test)

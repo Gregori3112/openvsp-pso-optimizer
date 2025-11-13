@@ -1,0 +1,26 @@
+=============================================
+   RESULTADOS FINAIS DA OTIMIZAÇÃO PSO
+=============================================
+
+[ok] CL=0.2596, CD=0.0049, L/D=52.57
+[solver] Simulação VSPAERO executada.
+
+Iterações concluídas (k): 30
+Critério de convergência (delta): 0.001056
+Melhor valor da função objetivo (gbest): -52.567043
+
+📊 Variáveis ótimas encontradas (xgbest):
+   AR         =  10.0000
+   span       =  34.5544
+   taper      =   1.0000
+   sweep      =  10.0000
+   twist      =   1.0511
+
+✅ Gráficos e resultados salvos em:
+C:\VSP\Development\PSO_PYTHON_WING\resultados_variaveis
+
+[final-check] Reavaliação do gbest:
+fobj=-52.567592 → L/D=52.5676, CL=0.25959, CD=0.004938
+L/W (sustentação relativa ao peso) = 104.10%
+L/W (sustentação relativa ao peso) = 104.10%
+CL ideal para L = W = 0.2494
