@@ -45,8 +45,8 @@ xmin = np.array([6, 34, 0.5, 0.0, -3.0])
 xmax = np.array([10, 38, 1.0, 10.0, 3.0])
 
 nrvar = len(xmin)       # número de variáveis = 5
-pop = 20                # quantidade de partículas
-itermax = 30            # número máximo de iterações do PSO
+pop = 2                # quantidade de partículas
+itermax = 10           # número máximo de iterações do PSO
 tol = 1e-4              # tolerância para critério de estagnação
 
 # Parâmetros clássicos do PSO
@@ -84,12 +84,19 @@ xlbest = np.zeros((pop, nrvar))  # melhor posição já encontrada por cada part
 gbest = [1e30]                   # melhor valor global
 k = 1                            # contador de iterações
 
-# Avaliação inicial das partículas
+# ASA BASE para iniciar o PSO
+asa_base = np.array([7.5, 36.0, 1.0, 0.0, 0.0])
+
+# Loop de inicialização das partículas
 for i in range(pop):
 
-    # Gera posição inicial aleatória dentro dos limites
-    for j in range(nrvar):
-        x[i, j] = xmin[j] + (xmax[j] - xmin[j]) * random.random()
+    if i == 0:
+        # A primeira partícula é a asa base real
+        x[i, :] = asa_base
+    else:
+        # As demais são aleatórias
+        for j in range(nrvar):
+            x[i, j] = xmin[j] + (xmax[j] - xmin[j]) * random.random()
 
     # Calcula função objetivo e extrai dados aerodinâmicos
     y, data = FCN(x[i, :])

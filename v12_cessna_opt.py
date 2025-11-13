@@ -119,6 +119,9 @@ def FCN(x: np.ndarray):
     # ------------------------------------------------------------
     vsp.SetAnalysisInputDefaults(solver_id)  # reseta opções
 
+    # 🔥 ATIVA VORTEX + PARASITE DRAG
+    vsp.SetIntAnalysisInput(solver_id, "AnalysisMethod", [2])
+
     # Evita erros com arquivos opcionais que o solver não precisa gerar
     available_inputs = []
     try:
